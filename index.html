@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tai Lung — نظام الفواتير والشحن</title>
+  <!-- ربط ملف التصميم -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- مكتبة سوبر بيس (Supabase) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- شاشة التحميل -->
+<div id="loading-screen" class="loading-screen">
+  <h1>Tai Lung</h1>
+  <p>جاري تحميل البيانات...</p>
+</div>
+
+<!-- أيقونات النظام (SVG) -->
+<svg width="0" height="0" style="position:absolute; display:none;">
+  <defs>
+    <linearGradient id="grad-red-3d" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4D4D" /><stop offset="50%" stop-color="#E60000" /><stop offset="100%" stop-color="#800000" />
+    </linearGradient>
+    <linearGradient id="grad-white-3d" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" /><stop offset="100%" stop-color="#D1D5DB" />
+    </linearGradient>
+    <g id="icon-new"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 1.5L18.5 9H13V3.5zM11 16H8v-2h3v-3h2v3h3v2h-3v3h-2v-3z"/></g>
+    <g id="icon-archive"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></g>
+    <g id="icon-customers"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></g>
+    <g id="icon-print"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></g>
+    <g id="icon-save"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></g>
+    <g id="icon-clear"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></g>
+    <g id="icon-add"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></g>
+    <g id="icon-shipping"><path d="M21 16.5c0 .38-.21.71-.53.88l-7.9 4.44c-.16.12-.36.18-.57.18s-.41-.06-.57-.18l-7.9-4.44A.991.991 0 0 1 3 16.5v-9c0-.38.21-.71.53-.88l7.9-4.44c.16-.12.36-.18.57-.18s.41.06.57.18l7.9 4.44c.32.17.53.5.53.88v9zM12 4.15L6.04 7.5 12 10.85l5.96-3.35L12 4.15zM5 15.91l6 3.38v-6.71L5 9.21v6.7zM19 15.91v-6.7l-6 3.37v6.71l6-3.38z"/></g>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <img src="logo.png" alt="Logo" class="brand-logo" onerror="this.style.display='none'">
+      <div class="brand-text">
+        <h1>Tai Lung</h1>
+        <span>صنع بواسطه محمد عبد الكريم</span>
+      </div>
+    </div>
+    <div class="folder-status">
+      <span class="dot" id="folderDot"></span>
+      <span id="folderLabel">لم يتم اختيار مجلد الأرشيف</span>
+      <button id="pickFolderBtn" type="button">ربط المجلد</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="new"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-new"></use></svg> فاتورة جديدة</button>
+    <button class="tab" data-view="shipping"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-shipping"></use></svg> بوليصة شحن</button>
+    <button class="tab" data-view="archive"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-archive"></use></svg> أرشيف الفواتير</button>
+    <button class="tab" data-view="customers"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-customers"></use></svg> دليل العملاء</button>
+  </nav>
+
+  <main>
+    <!-- الفاتورة الجديدة -->
+    <section class="view active" id="view-new">
+      <div class="card">
+        <h3 style="margin-top:0;">بيانات الفاتورة والعميل</h3>
+        <div class="grid4">
+          <div class="field"><label>رقم الفاتورة</label><input id="f-invnum" readonly></div>
+          <div class="field"><label>التاريخ</label><input id="f-date" type="date"></div>
+          <div class="field"><label>اسم العميل</label><input id="f-name" list="customerNames" placeholder="اسم العميل">
+            <datalist id="customerNames"></datalist></div>
+          <div class="field"><label>رقم الهاتف</label><input id="f-phone" placeholder="01xxxxxxxxx"></div>
+        </div>
+        <div class="field"><label>عنوان العميل</label><input id="f-address" placeholder="العنوان بالتفصيل"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">تفاصيل الأصناف</h3>
+        <table class="items" id="itemsTable">
+          <thead>
+            <tr>
+              <th style="width:40%">الوصف / القطعة</th>
+              <th style="width:15%; text-align:center;">الكمية</th>
+              <th style="width:20%; text-align:center;">سعر القطعة</th>
+              <th style="width:20%; text-align:left;">الإجمالي</th>
+              <th style="width:5%"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+        <button type="button" class="btn btn-ghost" id="addRowBtn" style="margin-top:16px;">
+          <svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-add"></use></svg> إضافة صنف
+        </button>
+
+        <div class="totals">
+          <table>
+            <tr><td>الإجمالي الفرعي</td><td id="subtotalCell">0</td></tr>
+            <tr>
+              <td>المدفوع / العربون</td>
+              <td><input type="number" id="f-paid" value="0" min="0" step="1" style="width:100%; text-align:left; font-size:18px; padding:10px; color:var(--ok);"></td>
+            </tr>
+            <tr class="grand"><td>المتبقي المستحق</td><td id="remainCell">0</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn btn-ghost" id="clearBtn"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-clear"></use></svg> تفريغ</button>
+        <button class="btn btn-dark" id="printBtn"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-print"></use></svg> طباعة احترافية</button>
+        <button class="btn btn-accent" id="saveBtn"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-save"></use></svg> حفظ الفاتورة</button>
+      </div>
+    </section>
+
+    <!-- بوليصة الشحن -->
+    <section class="view" id="view-shipping">
+      <div class="card">
+        <h3 style="margin-top:0;">إصدار بوليصة شحن (Label)</h3>
+        <div class="grid4">
+          <div class="field"><label>رقم الشحنة</label><input id="s-invnum" readonly></div>
+          <div class="field"><label>التاريخ</label><input id="s-date" type="date"></div>
+          <div class="field"><label>اسم المستلم</label><input id="s-name" list="customerNames" placeholder="اسم العميل"></div>
+          <div class="field"><label>رقم الهاتف</label><input id="s-phone" placeholder="01xxxxxxxxx"></div>
+        </div>
+        <div class="field"><label>عنوان المستلم بالتفصيل</label><input id="s-address" placeholder="المحافظة - المدينة - الشارع - العلامة المميزة"></div>
+        
+        <div class="grid2">
+          <div class="field">
+            <label>المبلغ الأساسي للشحنة</label>
+            <input id="s-amount" type="number" placeholder="0" style="color:var(--primary-red); font-size:18px;">
+          </div>
+          <div class="field">
+            <label>إجمالي التحصيل بعد الضريبة بالحروف</label>
+            <input id="s-amount-words" type="text" placeholder="فقط ... جنيهاً لا غير" style="color:var(--ink); font-size:16px;" readonly>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>محتوى الشحنة / تعليمات للمندوب</label>
+          <textarea id="s-details" rows="2" placeholder="مثال: عدد 2 كرتونة - قابل للكسر..."></textarea>
+        </div>
+        
+        <div class="toolbar" style="margin-top: 20px;">
+          <button class="btn btn-ghost" id="clearShippingBtn"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-clear"></use></svg> تفريغ</button>
+          <button class="btn btn-dark" id="printShippingBtn"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-print"></use></svg> طباعة البوليصة</button>
+          <button class="btn btn-accent" id="saveShippingBtn"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-save"></use></svg> حفظ الشحنة</button>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top: 30px;">
+        <h3 style="margin-top:0;">🗂 أرشيف بوليصات الشحن</h3>
+        <div class="search-bar"><input id="shippingSearch" placeholder="ابحث في الشحنات بالاسم، رقم الشحنة، أو الهاتف..."></div>
+        <div id="shippingList"></div>
+      </div>
+    </section>
+
+    <!-- الأرشيف والعملاء -->
+    <section class="view" id="view-archive">
+      <div class="search-bar"><input id="archiveSearch" placeholder="ابحث بالاسم، رقم الفاتورة، أو التاريخ..."></div>
+      <div id="archiveList"></div>
+    </section>
+
+    <section class="view" id="view-customers">
+      <div class="card">
+        <h3 style="margin-top:0;">إضافة عميل جديد</h3>
+        <div class="grid4">
+          <div class="field"><label>الاسم</label><input id="c-name"></div>
+          <div class="field"><label>رقم الهاتف</label><input id="c-phone"></div>
+          <div class="field" style="grid-column:span 2;"><label>العنوان</label><input id="c-address"></div>
+        </div>
+        <button class="btn btn-accent" id="addCustomerBtn" style="margin-top:10px;"><svg class="v-icon" viewBox="0 0 24 24"><use href="#icon-add"></use></svg> حفظ العميل</button>
+      </div>
+      <div class="search-bar"><input id="customerSearch" placeholder="ابحث عن عميل بالاسم أو الهاتف..."></div>
+      <div id="customersList"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ==================== قوالب الطباعة (مخفية) ==================== -->
+<div id="invoice-print" class="print-container">
+  <div class="inv-print-sheet">
+    <div class="inv-header">
+      <div class="inv-logo-area">
+        <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
+        <div><h1 class="print-font">Tai Lung</h1></div>
+      </div>
+      <div class="inv-meta">
+        <table>
+          <tr><td>رقم الفاتورة:</td><td id="p-invnum">INV-0000</td></tr>
+          <tr><td>تاريخ الإصدار:</td><td id="p-date">0000-00-00</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="inv-addresses">
+      <div class="inv-box">
+        <h3>بيانات العميل</h3>
+        <p>الاسم: <b id="p-name"></b></p>
+        <p>الهاتف: <b id="p-phone"></b></p>
+        <p>العنوان: <b id="p-address"></b></p>
+      </div>
+    </div>
+    <table class="inv-table">
+      <thead>
+        <tr>
+          <th style="width:50%">البيان / الوصف</th>
+          <th style="width:15%; text-align:center;">الكمية</th>
+          <th style="width:15%; text-align:center;">السعر</th>
+          <th style="width:20%; text-align:center;">الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody id="p-items"></tbody>
+    </table>
+    <div class="inv-summary">
+      <table>
+        <tr><td>الإجمالي الفرعي (ج.م)</td><td style="text-align:left;" id="p-subtotal">0</td></tr>
+        <tr><td>المدفوع / العربون (ج.م)</td><td style="text-align:left;" id="p-paid">0</td></tr>
+        <tr class="grand"><td>المتبقي المستحق (ج.م)</td><td style="text-align:left;" id="p-remain">0</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="shipping-print" class="print-container">
+  <div class="ship-print-sheet">
+    <div class="shp-header">
+      <div class="shp-logo-box">
+        <img src="logo.png" alt="Logo" onerror="this.style.display='none'">
+      </div>
+      <div class="shp-title-box"><h1>مصنع تايلونج</h1></div>
+      <div class="shp-code"><strong id="ps-invnum"></strong></div>
+    </div>
+    <div class="shp-receiver">
+      <h4>بيانات المستلم (TO)</h4>
+      <p id="ps-name"></p>
+      <p id="ps-phone"></p>
+      <p id="ps-address" style="font-size: 18px; margin-top:10px;"></p>
+    </div>
+    <div class="shp-details">
+      <span style="border-bottom:2px solid #000; padding-bottom:2px;">محتوى الشحنة / تعليمات:</span><br>
+      <div id="ps-details" style="margin-top:10px; font-weight:bold; font-size:18px;"></div>
+    </div>
+    <div class="shp-cod-box">
+      <h3>المبلغ المطلوب تحصيله (C.O.D)</h3>
+      <h1 id="ps-amount"></h1>
+      <div class="words" id="ps-amount-words"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- ربط ملف الجافاسكريبت -->
+<script src="script.js"></script>
+</body>
+</html>
